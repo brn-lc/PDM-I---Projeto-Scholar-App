@@ -19,6 +19,7 @@ import { SearchBar } from "../components/SearchBar";
 import { AppNavigationProp } from "../navigation/types";
 import { boletimService } from "../services/boletim.service";
 import { useApi } from "../hooks/useApi";
+import { BoletimAlunoItem } from "./BoletimScreen";
 
 type DashboardNavProp = AppNavigationProp<"Dashboard">;
 
@@ -29,7 +30,7 @@ export default function DashboardScreen() {
   const [search, setSearch] = useState("");
 
   // Usamos o nosso Hook para procurar o boletim caso o utilizador seja ALUNO
-  const { data: boletim, request: fetchBoletim } = useApi<any[]>();
+  const { data: boletim, request: fetchBoletim } = useApi<BoletimAlunoItem[]>();
 
   useEffect(() => {
     if (isFocused && user?.role === "ALUNO" && user?.email) {

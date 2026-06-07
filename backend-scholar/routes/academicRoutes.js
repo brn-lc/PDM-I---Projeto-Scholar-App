@@ -1,9 +1,13 @@
 const express = require("express");
 const router = express.Router();
+const authMiddleware = require("../middlewares/authMiddleware");
 
 // Importação dos Controladores
 const academicController = require("../controllers/academicController");
 const gradeController = require("../controllers/gradeController");
+
+// APLICA O MIDDLEWARE GLOBALMENTE NESTAS ROTAS ACADÊMICAS
+router.use(authMiddleware);
 
 // ==========================================
 // ROTAS DE ALUNOS

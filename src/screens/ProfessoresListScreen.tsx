@@ -1,3 +1,4 @@
+// src/screens/ProfessoresListScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -19,7 +20,7 @@ import { EmptyState } from "../components/EmptyState";
 import { Loading } from "../components/Loading";
 import { professorService } from "../services/professor.service";
 import { AlertHelper } from "../utils/AlertHelper";
-import { RootStackParamList } from "../navigation/types";
+import { RootStackParamList, Professor } from "../navigation/types"; // <-- Tipo importado
 
 type ProfessoresNavProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -29,7 +30,9 @@ type ProfessoresNavProp = NativeStackNavigationProp<
 export default function ProfessoresListScreen() {
   const navigation = useNavigation<ProfessoresNavProp>();
   const isFocused = useIsFocused();
-  const [professores, setProfessores] = useState<any[]>([]);
+
+  // Utilizando o tipo correto no lugar de any[]
+  const [professores, setProfessores] = useState<Professor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
@@ -49,7 +52,7 @@ export default function ProfessoresListScreen() {
     if (isFocused) carregarProfessores();
   }, [isFocused]);
 
-  const executarExclusao = async (id: string | number) => {
+  const executarExclusao = async (id: number) => {
     try {
       await professorService.delete(id);
       AlertHelper.show("Sucesso", "Professor excluído com sucesso!");
@@ -61,7 +64,7 @@ export default function ProfessoresListScreen() {
     }
   };
 
-  const handleDelete = (id: string | number, nome: string) => {
+  const handleDelete = (id: number, nome: string) => {
     AlertHelper.confirm(
       "Excluir Professor",
       `Tem certeza que deseja excluir o professor ${nome}?`,
@@ -75,7 +78,7 @@ export default function ProfessoresListScreen() {
       p.area?.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const renderItem = ({ item }: { item: any }) => (
+  const renderItem = ({ item }: { item: Professor }) => (
     <View style={styles.card}>
       <View style={styles.avatarIcon}>
         <Feather name="user" size={24} color="#A855F7" />

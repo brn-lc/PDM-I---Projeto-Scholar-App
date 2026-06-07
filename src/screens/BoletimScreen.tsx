@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../contexts/AuthContext";
-import { boletimService } from "../services/boletim.service";
+import { boletimService, NotaAtualizacao } from "../services/boletim.service";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
@@ -21,7 +21,17 @@ import { Loading } from "../components/Loading";
 import { AppButton } from "../components/Button";
 import { AlertHelper } from "../utils/AlertHelper";
 
-interface NotaAluno {
+// Tipagens rigorosas
+export interface BoletimAlunoItem {
+  id: string;
+  disciplina: string;
+  nota1: string | number;
+  nota2: string | number;
+  media: string | number;
+  situacao: string;
+}
+
+export interface NotaGestao {
   id: string;
   alunoNome: string;
   matricula: string;
@@ -31,12 +41,76 @@ interface NotaAluno {
   situacao: string;
 }
 
-interface DisciplinaGestao {
+export interface DisciplinaGestao {
   id: string;
   nome: string;
   professor: string;
-  notas: NotaAluno[];
+  notas: NotaGestao[];
 }
+
+// 1. Componente Memoizado para o Aluno (Evita re-renders desnecessários)
+const AlunoItemCard = memo(({ item }: { item: BoletimAlunoItem }) => {
+  const isAprovado = item.situacao === "Aprovado";
+  const isReprovado = item.situacao === "Reprovado";
+
+  return (
+    <View style={styles.cardGestao}>
+      <Text style={styles.disciplinaNome}>{item.disciplina}</Text>
+      <View style={styles.notasRow}>
+        <View style={styles.notaBox}>
+          <Text style={styles.notaLabel}>Nota 1</Text>
+          <Text style={styles.notaValor}>{item.nota1 || "-"}</Text>
+        </View>
+        <View style={styles.notaBox}>
+          <Text style={styles.notaLabel}>Nota 2</Text>
+          <Text style={styles.notaValor}>{item.nota2 || "-"}</Text>
+        </View>
+        <View
+          style={[
+            styles.notaBox,
+            {
+              backgroundColor: isAprovado
+                ? `${colors.success}15`
+                : isReprovado
+                  ? `${colors.danger}15`
+                  : colors.background,
+            },
+          ]}
+        >
+          <Text style={styles.notaLabel}>Média</Text>
+          <Text
+            style={[
+              styles.notaValor,
+              {
+                color: isAprovado
+                  ? colors.success
+                  : isReprovado
+                    ? colors.danger
+                    : colors.text,
+              },
+            ]}
+          >
+            {item.media || "-"}
+          </Text>
+        </View>
+      </View>
+      <View
+        style={[
+          styles.statusBadge,
+          {
+            backgroundColor: isAprovado
+              ? colors.success
+              : isReprovado
+                ? colors.danger
+                : colors.textSecondary,
+          },
+        ]}
+      >
+        <Text style={styles.statusText}>{item.situacao}</Text>
+      </View>
+    </View>
+  );
+});
 
 export default function BoletimScreen() {
   const { user } = useAuth();
@@ -48,7 +122,7 @@ export default function BoletimScreen() {
   const [gestaoDisciplinas, setGestaoDisciplinas] = useState<
     DisciplinaGestao[]
   >([]);
-  const [boletimAluno, setBoletimAluno] = useState<any[]>([]);
+  const [boletimAluno, setBoletimAluno] = useState<BoletimAlunoItem[]>([]);
 
   useEffect(() => {
     if (isFocused) {
@@ -74,42 +148,45 @@ export default function BoletimScreen() {
     }
   };
 
-  const handleNotaChange = (
-    disciplinaId: string,
-    matriculaId: string,
-    campo: "nota1" | "nota2",
-    valor: string,
-  ) => {
-    let numericVal = valor.replace(/[^0-9.,]/g, "").replace(",", ".");
+  // Otimização: useCallback para evitar recriação da função
+  const handleNotaChange = useCallback(
+    (
+      disciplinaId: string,
+      matriculaId: string,
+      campo: "nota1" | "nota2",
+      valor: string,
+    ) => {
+      const numericVal = valor.replace(/[^0-9.,]/g, "").replace(",", ".");
 
-    setGestaoDisciplinas((prev) =>
-      prev.map((disciplina) => {
-        if (disciplina.id !== disciplinaId) return disciplina;
+      setGestaoDisciplinas((prev) =>
+        prev.map((disciplina) => {
+          if (disciplina.id !== disciplinaId) return disciplina;
 
-        const novasNotas = disciplina.notas.map((aluno) => {
-          if (aluno.id !== matriculaId) return aluno;
+          const novasNotas = disciplina.notas.map((aluno) => {
+            if (aluno.id !== matriculaId) return aluno;
 
-          const alunoAtualizado = { ...aluno, [campo]: numericVal };
+            const alunoAtualizado = { ...aluno, [campo]: numericVal };
+            const n1 = parseFloat(alunoAtualizado.nota1 as string);
+            const n2 = parseFloat(alunoAtualizado.nota2 as string);
 
-          const n1 = parseFloat(alunoAtualizado.nota1 as string);
-          const n2 = parseFloat(alunoAtualizado.nota2 as string);
+            if (!isNaN(n1) && !isNaN(n2)) {
+              const media = (n1 + n2) / 2;
+              alunoAtualizado.media = media.toFixed(1);
+              alunoAtualizado.situacao = media >= 6 ? "Aprovado" : "Reprovado";
+            } else {
+              alunoAtualizado.media = "-";
+              alunoAtualizado.situacao = "Cursando";
+            }
 
-          if (!isNaN(n1) && !isNaN(n2)) {
-            const media = (n1 + n2) / 2;
-            alunoAtualizado.media = media.toFixed(1);
-            alunoAtualizado.situacao = media >= 6 ? "Aprovado" : "Reprovado";
-          } else {
-            alunoAtualizado.media = "-";
-            alunoAtualizado.situacao = "Cursando";
-          }
+            return alunoAtualizado;
+          });
 
-          return alunoAtualizado;
-        });
-
-        return { ...disciplina, notas: novasNotas };
-      }),
-    );
-  };
+          return { ...disciplina, notas: novasNotas };
+        }),
+      );
+    },
+    [],
+  );
 
   const handleSalvarNotas = async (disciplinaId: string) => {
     const disciplina = gestaoDisciplinas.find((d) => d.id === disciplinaId);
@@ -117,167 +194,116 @@ export default function BoletimScreen() {
 
     setSavingId(disciplinaId);
     try {
-      await boletimService.updateNotas(disciplina.notas);
+      // Mapeia para garantir que a tipagem bate com a API
+      const payload: NotaAtualizacao[] = disciplina.notas.map((n) => ({
+        id: n.id,
+        nota1: n.nota1,
+        nota2: n.nota2,
+        media: n.media,
+        situacao: n.situacao,
+      }));
+
+      await boletimService.updateNotas(payload);
       AlertHelper.show(
         "Sucesso",
-        `Notas da disciplina ${disciplina.nome} guardadas com sucesso!`,
+        `Notas da disciplina ${disciplina.nome} salvas com sucesso!`,
       );
     } catch (error) {
-      AlertHelper.show("Erro", "Ocorreu um erro ao guardar as notas.");
+      AlertHelper.show("Erro", "Ocorreu um erro ao salvar as notas.");
     } finally {
       setSavingId(null);
     }
   };
 
-  const renderGestaoItem = ({ item }: { item: DisciplinaGestao }) => (
-    <View style={styles.cardGestao}>
-      <Text style={styles.disciplinaNome}>{item.nome}</Text>
-      <Text style={styles.profNome}>Prof. {item.professor}</Text>
+  // 2. Extracão das funções de renderização usando useCallback
+  const renderGestaoItem = useCallback(
+    ({ item }: { item: DisciplinaGestao }) => (
+      <View style={styles.cardGestao}>
+        <Text style={styles.disciplinaNome}>{item.nome}</Text>
+        <Text style={styles.profNome}>Prof. {item.professor}</Text>
 
-      {item.notas.length === 0 ? (
-        <Text style={styles.emptyText}>Sem alunos matriculados.</Text>
-      ) : (
-        <View style={styles.tableContainer}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.th, { flex: 2 }]}>Aluno</Text>
-            <Text style={styles.th}>N1</Text>
-            <Text style={styles.th}>N2</Text>
-            <Text style={styles.th}>Média</Text>
-            <Text style={styles.th}>Status</Text>
+        {item.notas.length === 0 ? (
+          <Text style={styles.emptyText}>Sem alunos matriculados.</Text>
+        ) : (
+          <View style={styles.tableContainer}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.th, { flex: 2 }]}>Aluno</Text>
+              <Text style={styles.th}>N1</Text>
+              <Text style={styles.th}>N2</Text>
+              <Text style={styles.th}>Média</Text>
+              <Text style={styles.th}>Status</Text>
+            </View>
+
+            {item.notas.map((aluno) => {
+              const isAprovado = aluno.situacao === "Aprovado";
+              const isReprovado = aluno.situacao === "Reprovado";
+
+              return (
+                <View key={aluno.id} style={styles.tableRow}>
+                  <Text
+                    style={[styles.td, { flex: 2, fontWeight: "bold" }]}
+                    numberOfLines={1}
+                  >
+                    {aluno.alunoNome}
+                  </Text>
+                  <TextInput
+                    style={styles.gradeInput}
+                    value={aluno.nota1?.toString()}
+                    onChangeText={(txt) =>
+                      handleNotaChange(item.id, aluno.id, "nota1", txt)
+                    }
+                    keyboardType="numeric"
+                    maxLength={4}
+                  />
+                  <TextInput
+                    style={styles.gradeInput}
+                    value={aluno.nota2?.toString()}
+                    onChangeText={(txt) =>
+                      handleNotaChange(item.id, aluno.id, "nota2", txt)
+                    }
+                    keyboardType="numeric"
+                    maxLength={4}
+                  />
+                  <Text style={[styles.td, { fontWeight: "bold" }]}>
+                    {aluno.media}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.td,
+                      {
+                        fontSize: 10,
+                        fontWeight: "bold",
+                        color: isAprovado
+                          ? colors.success
+                          : isReprovado
+                            ? colors.danger
+                            : colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {aluno.situacao}
+                  </Text>
+                </View>
+              );
+            })}
+
+            <AppButton
+              title="Salvar Notas da Turma"
+              onPress={() => handleSalvarNotas(item.id)}
+              loading={savingId === item.id}
+              style={{ marginTop: spacing.md }}
+            />
           </View>
-
-          {item.notas.map((aluno) => {
-            const isAprovado = aluno.situacao === "Aprovado";
-            const isReprovado = aluno.situacao === "Reprovado";
-
-            return (
-              <View key={aluno.id} style={styles.tableRow}>
-                <Text
-                  style={[styles.td, { flex: 2, fontWeight: "bold" }]}
-                  numberOfLines={1}
-                >
-                  {aluno.alunoNome}
-                </Text>
-
-                <TextInput
-                  style={styles.gradeInput}
-                  value={aluno.nota1?.toString()}
-                  onChangeText={(txt) =>
-                    handleNotaChange(item.id, aluno.id, "nota1", txt)
-                  }
-                  keyboardType="numeric"
-                  maxLength={4}
-                />
-
-                <TextInput
-                  style={styles.gradeInput}
-                  value={aluno.nota2?.toString()}
-                  onChangeText={(txt) =>
-                    handleNotaChange(item.id, aluno.id, "nota2", txt)
-                  }
-                  keyboardType="numeric"
-                  maxLength={4}
-                />
-
-                <Text style={[styles.td, { fontWeight: "bold" }]}>
-                  {aluno.media}
-                </Text>
-
-                <Text
-                  style={[
-                    styles.td,
-                    {
-                      fontSize: 10,
-                      fontWeight: "bold",
-                      color: isAprovado
-                        ? colors.success
-                        : isReprovado
-                          ? colors.danger
-                          : colors.textSecondary,
-                    },
-                  ]}
-                >
-                  {aluno.situacao}
-                </Text>
-              </View>
-            );
-          })}
-
-          <AppButton
-            title="Salvar Notas da Turma"
-            onPress={() => handleSalvarNotas(item.id)}
-            loading={savingId === item.id}
-            style={{ marginTop: spacing.md }}
-          />
-        </View>
-      )}
-    </View>
+        )}
+      </View>
+    ),
+    [handleNotaChange, savingId],
   );
 
-  const renderAlunoItem = ({ item }: { item: any }) => {
-    const isAprovado = item.situacao === "Aprovado";
-    const isReprovado = item.situacao === "Reprovado";
-
-    return (
-      <View style={styles.cardGestao}>
-        <Text style={styles.disciplinaNome}>{item.disciplina}</Text>
-
-        <View style={styles.notasRow}>
-          <View style={styles.notaBox}>
-            <Text style={styles.notaLabel}>Nota 1</Text>
-            <Text style={styles.notaValor}>{item.nota1 || "-"}</Text>
-          </View>
-          <View style={styles.notaBox}>
-            <Text style={styles.notaLabel}>Nota 2</Text>
-            <Text style={styles.notaValor}>{item.nota2 || "-"}</Text>
-          </View>
-          <View
-            style={[
-              styles.notaBox,
-              {
-                backgroundColor: isAprovado
-                  ? `${colors.success}15`
-                  : isReprovado
-                    ? `${colors.danger}15`
-                    : colors.background,
-              },
-            ]}
-          >
-            <Text style={styles.notaLabel}>Média</Text>
-            <Text
-              style={[
-                styles.notaValor,
-                {
-                  color: isAprovado
-                    ? colors.success
-                    : isReprovado
-                      ? colors.danger
-                      : colors.text,
-                },
-              ]}
-            >
-              {item.media || "-"}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={[
-            styles.statusBadge,
-            {
-              backgroundColor: isAprovado
-                ? colors.success
-                : isReprovado
-                  ? colors.danger
-                  : colors.textSecondary,
-            },
-          ]}
-        >
-          <Text style={styles.statusText}>{item.situacao}</Text>
-        </View>
-      </View>
-    );
-  };
+  const renderAlunoItem = useCallback(
+    ({ item }: { item: BoletimAlunoItem }) => <AlunoItemCard item={item} />,
+    [],
+  );
 
   if (loading) return <Loading />;
 
@@ -326,11 +352,9 @@ export default function BoletimScreen() {
   );
 }
 
+// Manter exatamente os mesmos styles originais abaixo
 const styles = StyleSheet.create({
-  listContent: {
-    paddingVertical: spacing.sm,
-    paddingBottom: spacing.xxl,
-  },
+  listContent: { paddingVertical: spacing.sm, paddingBottom: spacing.xxl },
   cardGestao: {
     backgroundColor: colors.surface,
     borderRadius: 20,
@@ -355,9 +379,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: spacing.sm,
   },
-  tableContainer: {
-    marginTop: spacing.sm,
-  },
+  tableContainer: { marginTop: spacing.sm },
   tableHeader: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -377,12 +399,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.sm,
   },
-  td: {
-    flex: 1,
-    fontSize: 12,
-    color: colors.text,
-    textAlign: "center",
-  },
+  td: { flex: 1, fontSize: 12, color: colors.text, textAlign: "center" },
   gradeInput: {
     flex: 1,
     backgroundColor: colors.background,

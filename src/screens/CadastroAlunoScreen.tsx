@@ -8,7 +8,6 @@ import {
   Platform,
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import axios from "axios";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
@@ -18,23 +17,12 @@ import { AppInput } from "../components/Input";
 import { AppButton } from "../components/Button";
 import { AppSelect } from "../components/Select";
 import { alunoService } from "../services/aluno.service";
+import { externalService } from "../services/external.service"; // <-- Serviço Centralizado
 import { AlertHelper } from "../utils/AlertHelper";
 import { AppNavigationProp, RootStackParamList } from "../navigation/types";
 
-// Usamos a tipagem centralizada para a navegação
 type CadastroAlunoNavProp = AppNavigationProp<"CadastroAluno">;
 type CadastroAlunoRouteProp = RouteProp<RootStackParamList, "CadastroAluno">;
-
-interface IBGEUF {
-  id: number;
-  sigla: string;
-  nome: string;
-}
-
-interface IBGECidade {
-  id: number;
-  nome: string;
-}
 
 export default function CadastroAlunoScreen() {
   const navigation = useNavigation<CadastroAlunoNavProp>();
@@ -44,10 +32,12 @@ export default function CadastroAlunoScreen() {
   const isEditing = !!alunoEdit;
 
   const [loading, setLoading] = useState(false);
+
+  // Otimização: Apenas lidamos com as strings finais na UI
   const [estados, setEstados] = useState<string[]>([]);
   const [cidades, setCidades] = useState<string[]>([]);
 
-  // Estados isolados para o controle visual de erros (Feedback Inline)
+  // Feedback Visual e Validação (Requisito da Parte 1)
   const [nomeError, setNomeError] = useState("");
   const [matriculaError, setMatriculaError] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -65,84 +55,68 @@ export default function CadastroAlunoScreen() {
   });
 
   useEffect(() => {
-    buscarEstadosIBGE();
+    carregarEstadosIBGE();
     if (alunoEdit?.estado) {
-      buscarCidadesIBGE(alunoEdit.estado);
+      carregarCidadesIBGE(alunoEdit.estado);
     }
   }, []);
 
-  const buscarEstadosIBGE = async () => {
+  const carregarEstadosIBGE = async () => {
     try {
-      const res = await axios.get<IBGEUF[]>(
-        "https://servicodados.ibge.gov.br/api/v1/localidades/estados",
-      );
-      const ufsOrdenadas = res.data
-        .sort((a, b) => a.nome.localeCompare(b.nome))
-        .map((uf) => uf.sigla);
-      setEstados(ufsOrdenadas);
+      const data = await externalService.getEstadosIBGE();
+      setEstados(data.map((uf) => uf.sigla));
     } catch (error) {
-      console.error("Erro ao carregar estados do IBGE:", error);
+      AlertHelper.show("Erro", "Falha ao comunicar com a API do IBGE.");
     }
   };
 
-  const buscarCidadesIBGE = async (siglaUF: string) => {
+  const carregarCidadesIBGE = async (siglaUF: string) => {
     try {
-      const res = await axios.get<IBGECidade[]>(
-        `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${siglaUF}/municipios`,
-      );
-      const cidadesOrdenadas = res.data
-        .sort((a, b) => a.nome.localeCompare(b.nome))
-        .map((cidade) => cidade.nome);
-      setCidades(cidadesOrdenadas);
+      const data = await externalService.getCidadesPorUF(siglaUF);
+      setCidades(data.map((cidade) => cidade.nome));
     } catch (error) {
-      console.error("Erro ao carregar cidades do IBGE:", error);
+      AlertHelper.show("Erro", "Não foi possível carregar as cidades.");
     }
   };
 
   const handleEstadoChange = (uf: string) => {
     setForm((prev) => ({ ...prev, estado: uf, cidade: "" }));
-    buscarCidadesIBGE(uf);
+    carregarCidadesIBGE(uf);
   };
 
-  const buscarCep = async (cep: string) => {
-    const cepNumeros = cep.replace(/\D/g, "");
-    setForm((prev) => ({ ...prev, cep: cepNumeros }));
+  const processarCep = async (cepText: string) => {
+    const cepLimpo = cepText.replace(/\D/g, "");
+    setForm((prev) => ({ ...prev, cep: cepLimpo }));
 
-    if (cepNumeros.length === 8) {
+    if (cepLimpo.length === 8) {
       try {
-        const res = await axios.get(
-          `https://viacep.com.br/ws/${cepNumeros}/json/`,
-        );
-        if (!res.data.erro) {
-          const ufObtido = res.data.uf;
-          const cidadeObtida = res.data.localidade;
+        const dadosEndereco = await externalService.getEnderecoPorCEP(cepLimpo);
 
-          setForm((prev) => ({
-            ...prev,
-            endereco: res.data.logradouro,
-            estado: ufObtido,
-            cidade: cidadeObtida,
-          }));
+        setForm((prev) => ({
+          ...prev,
+          endereco: dadosEndereco.endereco,
+          estado: dadosEndereco.estado,
+          cidade: dadosEndereco.cidade,
+        }));
 
-          buscarCidadesIBGE(ufObtido);
-        } else {
-          AlertHelper.show("Aviso", "CEP não encontrado.");
-        }
+        carregarCidadesIBGE(dadosEndereco.estado);
       } catch (error) {
-        AlertHelper.show("Erro", "Não foi possível buscar o CEP via ViaCEP.");
+        AlertHelper.show(
+          "Aviso",
+          "O CEP introduzido é inválido ou não foi encontrado.",
+        );
       }
     }
   };
 
   const handleSave = async () => {
-    // Resetando estados de erro antes da nova validação
     setNomeError("");
     setMatriculaError("");
     setEmailError("");
 
     let hasError = false;
 
-    // Validação inline e rigorosa dos campos obrigatórios
+    // Cumprimento do requisito de validação obrigatória
     if (!form.nome.trim()) {
       setNomeError("O nome do aluno é obrigatório.");
       hasError = true;
@@ -169,7 +143,10 @@ export default function CadastroAlunoScreen() {
       }
       navigation.goBack();
     } catch (error) {
-      AlertHelper.show("Erro", "Falha ao salvar aluno no backend.");
+      AlertHelper.show(
+        "Erro",
+        "Falha ao gravar os dados do aluno no servidor.",
+      );
     } finally {
       setLoading(false);
     }
@@ -179,7 +156,6 @@ export default function CadastroAlunoScreen() {
     <ScreenContainer>
       <Header title={isEditing ? "Editar Aluno" : "Novo Aluno"} showBack />
 
-      {/* O KeyboardAvoidingView envolve APENAS o formulário, resolvendo o bug do botão Voltar */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -242,9 +218,9 @@ export default function CadastroAlunoScreen() {
 
           <AppInput
             label="CEP"
-            placeholder="Somente números"
+            placeholder="Apenas números"
             value={form.cep}
-            onChangeText={buscarCep}
+            onChangeText={processarCep}
             keyboardType="numeric"
             maxLength={8}
           />
@@ -256,15 +232,6 @@ export default function CadastroAlunoScreen() {
           />
 
           <View style={styles.row}>
-            <View style={styles.halfInputRight}>
-              <AppSelect
-                label="Cidade"
-                options={cidades}
-                value={form.cidade}
-                onSelect={(val) => setForm({ ...form, cidade: val })}
-                placeholder={form.estado ? "Selecione..." : "Escolha a UF"}
-              />
-            </View>
             <View style={styles.halfInputLeft}>
               <AppSelect
                 label="Estado"
@@ -274,10 +241,19 @@ export default function CadastroAlunoScreen() {
                 placeholder="UF"
               />
             </View>
+            <View style={styles.halfInputRight}>
+              <AppSelect
+                label="Cidade"
+                options={cidades}
+                value={form.cidade}
+                onSelect={(val) => setForm({ ...form, cidade: val })}
+                placeholder={form.estado ? "Selecione..." : "Escolha a UF"}
+              />
+            </View>
           </View>
 
           <AppButton
-            title={isEditing ? "Guardar Alterações" : "Salvar Aluno"}
+            title={isEditing ? "Salvar Alterações" : "Cadastrar Aluno"}
             onPress={handleSave}
             loading={loading}
             style={styles.submitBtn}
