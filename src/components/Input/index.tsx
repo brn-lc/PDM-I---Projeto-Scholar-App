@@ -27,7 +27,7 @@ export function AppInput({ label, error, style, ...rest }: AppInputProps) {
         {...rest}
       />
       {/* Exibe a mensagem de erro se existir */}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }

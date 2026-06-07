@@ -42,7 +42,7 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const data = await authService.login(email, password);
+      const data = await authService.login(email.trim(), password);
       await signIn(data.token, data.user);
     } catch (error: any) {
       const msg = error.response?.data?.error || "Credenciais inválidas.";

@@ -18,4 +18,12 @@ export const alunoService = {
     const response = await api.delete(`/api/alunos/${id}`);
     return response.data;
   },
+  getMeuPerfil: async (email: string) => {
+    const response = await api.get(`/api/alunos/perfil/${email}`);
+    return response.data;
+  },
+  updateMeuPerfil: async (emailAtual: string, data: any) => {
+    const response = await api.put(`/api/alunos/perfil/${emailAtual}`, data);
+    return response.data;
+  },
 };

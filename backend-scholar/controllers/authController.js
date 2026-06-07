@@ -46,23 +46,35 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 
+  // 1. Verifica exatamente o que chegou ao backend
+  console.log(`[Login] Tentativa de acesso. Email recebido: '${email}'`);
+
   if (!email || !password) {
     return res.status(400).json({ error: "E-mail e senha são obrigatórios." });
   }
 
   try {
     const result = await db.query("SELECT * FROM usuarios WHERE email = $1", [
-      email,
+      email.trim(),
     ]);
 
     if (result.rows.length === 0) {
+      // 2. Se cair aqui, o e-mail não foi encontrado na tabela
+      console.log("[Login] FALHA: E-mail não encontrado na base de dados.");
       return res.status(401).json({ error: "Credenciais inválidas." });
     }
 
     const user = result.rows[0];
+    console.log(
+      `[Login] SUCESSO: Utilizador encontrado no banco (ID: ${user.id}). A comparar senha...`,
+    );
 
-    // Comparação de hash segura contra ataques de timing
     const senhaValida = await bcrypt.compare(password, user.senha);
+
+    // 3. Verifica se a biblioteca bcrypt validou a senha
+    console.log(
+      `[Login] RESULTADO BCRYPT: A senha está correta? ${senhaValida}`,
+    );
 
     if (!senhaValida) {
       return res.status(401).json({ error: "Credenciais inválidas." });

@@ -47,4 +47,18 @@ router.get("/gestao-notas", gradeController.getGestaoNotas);
 router.put("/gestao-notas", gradeController.updateNotasDaTurma);
 router.get("/boletim/:matricula", gradeController.getBoletimAluno);
 
+// ==========================================
+// ROTAS DE PERFIL DO ALUNO E PROFESSOR
+// ==========================================
+router.get("/alunos/perfil/:email", academicController.getMeuPerfil);
+router.put("/alunos/perfil/:emailAtual", academicController.updateMeuPerfil);
+router.get(
+  "/professores/perfil/:email",
+  academicController.getMeuPerfilProfessor,
+);
+router.put(
+  "/professores/perfil/:emailAtual",
+  academicController.updateMeuPerfilProfessor,
+);
+
 module.exports = router;

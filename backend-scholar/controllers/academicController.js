@@ -1,4 +1,5 @@
 const db = require("../database/db");
+const bcrypt = require("bcrypt");
 
 // ==========================================
 // LISTAGENS DE USUÁRIOS
@@ -364,5 +365,119 @@ exports.deletarProfessor = async (req, res) => {
   } catch (error) {
     console.error("[Erro] Deletar Professor:", error);
     res.status(500).json({ error: "Erro ao excluir professor." });
+  }
+};
+
+// ==========================================
+// PERFIL DO ALUNO (MEU PERFIL)
+// ==========================================
+exports.getMeuPerfil = async (req, res) => {
+  const { email } = req.params;
+  try {
+    const result = await db.query("SELECT * FROM alunos WHERE email = $1", [
+      email,
+    ]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Perfil não encontrado." });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("[Erro] Buscar Perfil:", error);
+    res.status(500).json({ error: "Erro ao carregar perfil." });
+  }
+};
+
+exports.updateMeuPerfil = async (req, res) => {
+  const { emailAtual } = req.params;
+  const { email, senha, telefone, cep, endereco, cidade, estado } = req.body;
+
+  try {
+    // 1. Atualizar a tabela de Alunos (dados demográficos)
+    await db.query(
+      "UPDATE alunos SET email = $1, telefone = $2, cep = $3, endereco = $4, cidade = $5, estado = $6 WHERE email = $7",
+      [email, telefone, cep, endereco, cidade, estado, emailAtual],
+    );
+
+    // 2. Atualizar a tabela de Usuários (credenciais de login)
+    if (senha && senha.trim() !== "") {
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(senha, saltRounds);
+      await db.query(
+        "UPDATE usuarios SET email = $1, senha = $2 WHERE email = $3",
+        [email, hashedPassword, emailAtual],
+      );
+    } else {
+      await db.query("UPDATE usuarios SET email = $1 WHERE email = $2", [
+        email,
+        emailAtual,
+      ]);
+    }
+
+    res.json({ message: "Perfil atualizado com sucesso." });
+  } catch (error) {
+    console.error("[Erro] Atualizar Perfil:", error);
+    // Se o erro for de duplicação de email na base de dados
+    if (error.code === "23505") {
+      return res.status(400).json({
+        error: "Este e-mail já está a ser utilizado por outra conta.",
+      });
+    }
+    res.status(500).json({ error: "Erro interno ao atualizar perfil." });
+  }
+};
+
+// ==========================================
+// PERFIL DO PROFESSOR (MEU PERFIL)
+// ==========================================
+exports.getMeuPerfilProfessor = async (req, res) => {
+  const { email } = req.params;
+  try {
+    const result = await db.query(
+      "SELECT * FROM professores WHERE email = $1",
+      [email],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Perfil não encontrado." });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("[Erro] Buscar Perfil Professor:", error);
+    res.status(500).json({ error: "Erro ao carregar perfil." });
+  }
+};
+
+exports.updateMeuPerfilProfessor = async (req, res) => {
+  const { emailAtual } = req.params;
+  const { email, senha, tempo_docencia } = req.body;
+
+  try {
+    // 1. Atualiza a tabela de Professores
+    await db.query(
+      "UPDATE professores SET email = $1, tempo_docencia = $2 WHERE email = $3",
+      [email, tempo_docencia, emailAtual],
+    );
+
+    // 2. Atualiza a tabela de Usuários (credenciais)
+    if (senha && senha.trim() !== "") {
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(senha, saltRounds);
+      await db.query(
+        "UPDATE usuarios SET email = $1, senha = $2 WHERE email = $3",
+        [email, hashedPassword, emailAtual],
+      );
+    } else {
+      await db.query("UPDATE usuarios SET email = $1 WHERE email = $2", [
+        email,
+        emailAtual,
+      ]);
+    }
+
+    res.json({ message: "Perfil atualizado com sucesso." });
+  } catch (error) {
+    console.error("[Erro] Atualizar Perfil Professor:", error);
+    if (error.code === "23505") {
+      return res.status(400).json({ error: "Este e-mail já está em uso." });
+    }
+    res.status(500).json({ error: "Erro interno ao atualizar perfil." });
   }
 };

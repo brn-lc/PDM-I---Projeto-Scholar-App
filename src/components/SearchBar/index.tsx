@@ -1,11 +1,12 @@
 import React from "react";
-import { View, TextInput, StyleSheet } from "react-native";
+import { View, TextInput, StyleSheet, TextInputProps } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { spacing } from "../../theme/spacing";
 import { typography } from "../../theme/typography";
 
-interface SearchBarProps {
+// Estendemos as props nativas do TextInput para suportar onSubmitEditing
+interface SearchBarProps extends TextInputProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
@@ -15,6 +16,7 @@ export function SearchBar({
   value,
   onChangeText,
   placeholder = "Buscar...",
+  ...rest // Recebe o resto das propriedades (ex: onSubmitEditing)
 }: SearchBarProps) {
   return (
     <View style={styles.container}>
@@ -30,6 +32,7 @@ export function SearchBar({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}
+        {...rest}
       />
     </View>
   );

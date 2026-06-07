@@ -69,15 +69,17 @@ exports.getGestaoNotas = async (req, res) => {
 
 // --- CONSULTA DE BOLETIM PARA O ALUNO ---
 exports.getBoletimAluno = async (req, res) => {
-  const { matricula } = req.params; // Alterado para receber e filtrar por matrícula
+  const { matricula } = req.params;
+
   try {
+    // Atualizámos o WHERE para procurar pela matrícula OU pelo e-mail
     const result = await db.query(
       `
       SELECT m.id, d.nome as disciplina, m.nota1, m.nota2, m.media, m.situacao
       FROM notas m
       JOIN disciplinas d ON m.disciplina_id = d.id
       JOIN alunos a ON m.aluno_id = a.id
-      WHERE a.matricula = $1
+      WHERE a.matricula = $1 OR a.email = $1
     `,
       [matricula],
     );
@@ -90,6 +92,7 @@ exports.getBoletimAluno = async (req, res) => {
       media: r.media || "-",
       situacao: r.situacao || "Cursando",
     }));
+
     res.json(formatado);
   } catch (error) {
     console.error(error);

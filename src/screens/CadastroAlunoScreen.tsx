@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import axios from "axios";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
@@ -13,12 +19,10 @@ import { AppButton } from "../components/Button";
 import { AppSelect } from "../components/Select";
 import { alunoService } from "../services/aluno.service";
 import { AlertHelper } from "../utils/AlertHelper";
-import { RootStackParamList } from "../navigation/types";
+import { AppNavigationProp, RootStackParamList } from "../navigation/types";
 
-type CadastroAlunoNavProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "CadastroAluno"
->;
+// Usamos a tipagem centralizada para a navegação
+type CadastroAlunoNavProp = AppNavigationProp<"CadastroAluno">;
 type CadastroAlunoRouteProp = RouteProp<RootStackParamList, "CadastroAluno">;
 
 interface IBGEUF {
@@ -138,7 +142,7 @@ export default function CadastroAlunoScreen() {
 
     let hasError = false;
 
-    // Validação inline e rigorosa dos campos obrigatórios acadêmicos
+    // Validação inline e rigorosa dos campos obrigatórios
     if (!form.nome.trim()) {
       setNomeError("O nome do aluno é obrigatório.");
       hasError = true;
@@ -152,7 +156,6 @@ export default function CadastroAlunoScreen() {
       hasError = true;
     }
 
-    // Se houver algum erro de preenchimento, interrompe o fluxo antes de tocar na API
     if (hasError) return;
 
     setLoading(true);
@@ -173,109 +176,114 @@ export default function CadastroAlunoScreen() {
   };
 
   return (
-    // Ativa o gerenciamento global de teclado do ScreenContainer e limpa a árvore do layout
-    <ScreenContainer withKeyboard>
+    <ScreenContainer>
       <Header title={isEditing ? "Editar Aluno" : "Novo Aluno"} showBack />
 
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
+      {/* O KeyboardAvoidingView envolve APENAS o formulário, resolvendo o bug do botão Voltar */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <Text style={styles.subtitle}>Dados Acadêmicos e Pessoais</Text>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.subtitle}>Dados Académicos e Pessoais</Text>
 
-        <AppInput
-          label="Nome *"
-          placeholder="Nome completo"
-          value={form.nome}
-          onChangeText={(txt) => {
-            setForm({ ...form, nome: txt });
-            if (nomeError) setNomeError(""); // Limpa o erro ao digitar
-          }}
-          error={nomeError}
-        />
-        <AppInput
-          label="Matrícula *"
-          placeholder="Ex: 123456"
-          value={form.matricula}
-          onChangeText={(txt) => {
-            setForm({ ...form, matricula: txt });
-            if (matriculaError) setMatriculaError(""); // Limpa o erro ao digitar
-          }}
-          keyboardType="numeric"
-          error={matriculaError}
-        />
-        <AppInput
-          label="Curso"
-          placeholder="Ex: Análise de Sistemas"
-          value={form.curso}
-          onChangeText={(txt) => setForm({ ...form, curso: txt })}
-        />
-        <AppInput
-          label="E-mail *"
-          placeholder="aluno@email.com"
-          value={form.email}
-          onChangeText={(txt) => {
-            setForm({ ...form, email: txt });
-            if (emailError) setEmailError(""); // Limpa o erro ao digitar
-          }}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          error={emailError}
-        />
-        <AppInput
-          label="Telefone"
-          placeholder="(00) 00000-0000"
-          value={form.telefone}
-          onChangeText={(txt) => setForm({ ...form, telefone: txt })}
-          keyboardType="phone-pad"
-        />
+          <AppInput
+            label="Nome *"
+            placeholder="Nome completo"
+            value={form.nome}
+            onChangeText={(txt) => {
+              setForm({ ...form, nome: txt });
+              if (nomeError) setNomeError("");
+            }}
+            error={nomeError}
+          />
+          <AppInput
+            label="Matrícula *"
+            placeholder="Ex: 123456"
+            value={form.matricula}
+            onChangeText={(txt) => {
+              setForm({ ...form, matricula: txt });
+              if (matriculaError) setMatriculaError("");
+            }}
+            keyboardType="numeric"
+            error={matriculaError}
+          />
+          <AppInput
+            label="Curso"
+            placeholder="Ex: Análise de Sistemas"
+            value={form.curso}
+            onChangeText={(txt) => setForm({ ...form, curso: txt })}
+          />
+          <AppInput
+            label="E-mail *"
+            placeholder="aluno@email.com"
+            value={form.email}
+            onChangeText={(txt) => {
+              setForm({ ...form, email: txt });
+              if (emailError) setEmailError("");
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            error={emailError}
+          />
+          <AppInput
+            label="Telefone"
+            placeholder="(00) 00000-0000"
+            value={form.telefone}
+            onChangeText={(txt) => setForm({ ...form, telefone: txt })}
+            keyboardType="phone-pad"
+          />
 
-        <Text style={styles.sectionTitle}>Endereço (ViaCEP & IBGE)</Text>
+          <Text style={styles.sectionTitle}>Endereço (ViaCEP & IBGE)</Text>
 
-        <AppInput
-          label="CEP"
-          placeholder="Somente números"
-          value={form.cep}
-          onChangeText={buscarCep}
-          keyboardType="numeric"
-          maxLength={8}
-        />
-        <AppInput
-          label="Endereço"
-          placeholder="Rua, Avenida..."
-          value={form.endereco}
-          onChangeText={(txt) => setForm({ ...form, endereco: txt })}
-        />
+          <AppInput
+            label="CEP"
+            placeholder="Somente números"
+            value={form.cep}
+            onChangeText={buscarCep}
+            keyboardType="numeric"
+            maxLength={8}
+          />
+          <AppInput
+            label="Endereço"
+            placeholder="Rua, Avenida..."
+            value={form.endereco}
+            onChangeText={(txt) => setForm({ ...form, endereco: txt })}
+          />
 
-        <View style={styles.row}>
-          <View style={styles.halfInputRight}>
-            <AppSelect
-              label="Cidade"
-              options={cidades}
-              value={form.cidade}
-              onSelect={(val) => setForm({ ...form, cidade: val })}
-              placeholder={form.estado ? "Selecione..." : "Escolha a UF"}
-            />
+          <View style={styles.row}>
+            <View style={styles.halfInputRight}>
+              <AppSelect
+                label="Cidade"
+                options={cidades}
+                value={form.cidade}
+                onSelect={(val) => setForm({ ...form, cidade: val })}
+                placeholder={form.estado ? "Selecione..." : "Escolha a UF"}
+              />
+            </View>
+            <View style={styles.halfInputLeft}>
+              <AppSelect
+                label="Estado"
+                options={estados}
+                value={form.estado}
+                onSelect={handleEstadoChange}
+                placeholder="UF"
+              />
+            </View>
           </View>
-          <View style={styles.halfInputLeft}>
-            <AppSelect
-              label="Estado"
-              options={estados}
-              value={form.estado}
-              onSelect={handleEstadoChange}
-              placeholder="UF"
-            />
-          </View>
-        </View>
 
-        <AppButton
-          title={isEditing ? "Guardar Alterações" : "Salvar Aluno"}
-          onPress={handleSave}
-          loading={loading}
-          style={styles.submitBtn}
-        />
-      </ScrollView>
+          <AppButton
+            title={isEditing ? "Guardar Alterações" : "Salvar Aluno"}
+            onPress={handleSave}
+            loading={loading}
+            style={styles.submitBtn}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }

@@ -1,4 +1,9 @@
-// Tipagem das entidades principais do sistema
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
+// ==========================================
+// TIPAGEM DAS ENTIDADES PRINCIPAIS
+// ==========================================
+
 export interface Aluno {
   id: number;
   nome: string;
@@ -27,16 +32,19 @@ export interface Disciplina {
   carga_horaria: number;
   curso: string;
   semestre: string;
-  // O backend pode devolver o objeto professor inteiro ou apenas o ID dependendo da rota
   professor?: Professor | null;
   professor_id?: number | null;
 }
 
-// Tipagem das Rotas e dos Parâmetros que cada uma recebe
+// ==========================================
+// TIPAGEM DAS ROTAS DA APLICAÇÃO
+// ==========================================
+
 export type RootStackParamList = {
   // Autenticação e Principal
   Login: undefined;
   Dashboard: undefined;
+  MeuPerfil: undefined;
 
   // Listagens
   AlunosList: undefined;
@@ -56,3 +64,15 @@ export type RootStackParamList = {
   SelecionarProfessor: { disciplinaId: number };
   AdicionarAlunoDisciplina: { disciplinaId: number };
 };
+
+// ==========================================
+// TIPO UTILITÁRIO DE NAVEGAÇÃO GLOBAL
+// ==========================================
+
+/**
+ * Utilize este tipo nos seus ecrãs para ter a navegação estritamente tipada.
+ * Exemplo de uso num ecrã:
+ * const navigation = useNavigation<AppNavigationProp<"NomeDaSuaRota">>();
+ */
+export type AppNavigationProp<T extends keyof RootStackParamList> =
+  NativeStackNavigationProp<RootStackParamList, T>;

@@ -7,7 +7,6 @@ import {
   StyleSheet,
 } from "react-native";
 import { useNavigation, useIsFocused } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
@@ -18,60 +17,45 @@ import { SearchBar } from "../components/SearchBar";
 import { EmptyState } from "../components/EmptyState";
 import { Loading } from "../components/Loading";
 import { alunoService } from "../services/aluno.service";
-import { RootStackParamList, Aluno } from "../navigation/types";
+import { useApi } from "../hooks/useApi";
+import { AppNavigationProp } from "../navigation/types";
 import { AlertHelper } from "../utils/AlertHelper";
+import { Aluno } from "../navigation/types";
 
-type AlunosNavProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "AlunosList"
->;
+// Aplicação do tipo centralizado para a navegação deste ecrã
+type AlunosNavProp = AppNavigationProp<"AlunosList">;
 
 export default function AlunosListScreen() {
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const navigation = useNavigation<AlunosNavProp>();
   const isFocused = useIsFocused();
+
+  // Utilização do Hook customizado para gerir a chamada à API
+  const { data: alunos, loading, request } = useApi<Aluno[]>();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const carregarAlunos = () => request(alunoService.getAll);
 
   useEffect(() => {
     if (isFocused) carregarAlunos();
   }, [isFocused]);
 
-  const carregarAlunos = async () => {
-    try {
-      const data = await alunoService.getAll();
-      setAlunos(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const executarExclusao = async (id: number) => {
-    try {
-      await alunoService.delete(id);
-      AlertHelper.show("Sucesso", "Aluno excluído com sucesso!");
-      carregarAlunos();
-    } catch (error: any) {
-      const msgErro = error.response?.data?.error || "Erro ao excluir aluno.";
-      AlertHelper.show("Erro", msgErro);
-    }
-  };
-
   const handleDelete = (id: number, nome: string) => {
     AlertHelper.confirm(
       "Excluir Aluno",
-      `Tem certeza que deseja excluir o aluno ${nome}?`,
-      () => executarExclusao(id),
+      `Deseja excluir o aluno ${nome}?`,
+      async () => {
+        await alunoService.delete(id);
+        carregarAlunos(); // Recarrega a lista após a exclusão
+      },
     );
   };
 
-  const filtrados = alunos.filter((a) =>
+  const filtrados = (alunos || []).filter((a) =>
     a.nome?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  if (loading) return <Loading />;
+  // Mostra o loading inicial, mas permite que a lista fique visível durante um "refresh"
+  if (loading && !alunos) return <Loading />;
 
   return (
     <ScreenContainer>
@@ -145,7 +129,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  list: { paddingVertical: spacing.sm, paddingBottom: 40 },
+  list: {
+    paddingVertical: spacing.sm,
+    paddingBottom: 40,
+  },
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -166,14 +153,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: spacing.md,
   },
-  info: { flex: 1 },
+  info: {
+    flex: 1,
+  },
   title: {
     fontSize: typography.size.md,
     fontWeight: typography.weight.bold,
     color: colors.text,
   },
-  subtitle: { fontSize: typography.size.xs, color: colors.textSecondary },
-  actionButtons: { flexDirection: "row", gap: spacing.sm },
+  subtitle: {
+    fontSize: typography.size.xs,
+    color: colors.textSecondary,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
   iconButton: {
     width: 36,
     height: 36,

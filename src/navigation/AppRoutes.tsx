@@ -17,6 +17,7 @@ import DisciplinaDetailScreen from "../screens/DisciplinaDetailScreen";
 import CreateDisciplinaScreen from "../screens/CreateDisciplinaScreen";
 import SelecionarProfessorScreen from "../screens/SelecionarProfessorScreen";
 import AdicionarAlunoDisciplinaScreen from "../screens/AdicionarAlunoDisciplinaScreen";
+import MeuPerfilScreen from "../screens/MeuPerfilScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -44,7 +45,9 @@ export default function AppRoutes() {
         <Stack.Screen name="Login" component={LoginScreen} />
       ) : (
         <>
+          {/* O DASHBOARD DEVE SER SEMPRE A PRIMEIRA TELA DESTE BLOCO */}
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
+
           <Stack.Screen name="AlunosList" component={AlunosListScreen} />
           <Stack.Screen
             name="ProfessoresList"
@@ -76,6 +79,9 @@ export default function AppRoutes() {
             name="AdicionarAlunoDisciplina"
             component={AdicionarAlunoDisciplinaScreen}
           />
+
+          {/* O MeuPerfil pode ficar aqui no final */}
+          <Stack.Screen name="MeuPerfil" component={MeuPerfilScreen} />
         </>
       )}
     </Stack.Navigator>

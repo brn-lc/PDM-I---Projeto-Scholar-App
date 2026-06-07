@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,7 @@ import {
   Image,
   Platform,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useNavigation, useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../contexts/AuthContext";
 import { Feather } from "@expo/vector-icons";
 import { colors } from "../theme/colors";
@@ -17,23 +16,78 @@ import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 import { ScreenContainer } from "../components/ScreenContainer";
 import { SearchBar } from "../components/SearchBar";
-import { RootStackParamList } from "../navigation/types";
+import { AppNavigationProp } from "../navigation/types";
+import { boletimService } from "../services/boletim.service";
+import { useApi } from "../hooks/useApi";
 
-type DashboardNavProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "Dashboard"
->;
+type DashboardNavProp = AppNavigationProp<"Dashboard">;
 
 export default function DashboardScreen() {
   const { user, signOut } = useAuth();
   const navigation = useNavigation<DashboardNavProp>();
+  const isFocused = useIsFocused();
   const [search, setSearch] = useState("");
+
+  // Usamos o nosso Hook para procurar o boletim caso o utilizador seja ALUNO
+  const { data: boletim, request: fetchBoletim } = useApi<any[]>();
+
+  useEffect(() => {
+    if (isFocused && user?.role === "ALUNO" && user?.email) {
+      fetchBoletim(() => boletimService.getBoletimAluno(user.email));
+    }
+  }, [isFocused, user]);
+
+  // Lógica Funcional: Cálculo do Progresso do Semestre
+  let progresso = 0;
+  if (boletim && boletim.length > 0) {
+    const concluidas = boletim.filter(
+      (b) => b.situacao === "Aprovado" || b.situacao === "Reprovado",
+    ).length;
+    progresso = Math.round((concluidas / boletim.length) * 100);
+  }
+
+  // Função para formatar o nome em Title Case (Camel Case com espaços)
+  const formatarNome = (nome?: string) => {
+    if (!nome) return "Usuário";
+    return nome
+      .replace(/[._-]/g, " ") // Substitui pontos, traços e underscores por espaços
+      .split(" ")
+      .map(
+        (palavra) =>
+          palavra.charAt(0).toUpperCase() + palavra.slice(1).toLowerCase(),
+      )
+      .join(" ");
+  };
 
   const obterTituloNota = () => {
     return user?.role === "ALUNO" ? "Meu Boletim" : "Gestão de Notas";
   };
 
+  const handleSearch = () => {
+    const query = search.trim().toLowerCase();
+    if (!query) return;
+
+    if (query.includes("prof")) {
+      navigation.navigate("ProfessoresList");
+    } else if (query.includes("disc")) {
+      navigation.navigate("DisciplinasList");
+    } else if (query.includes("nota") || query.includes("boletim")) {
+      navigation.navigate("Boletim");
+    } else {
+      navigation.navigate("AlunosList");
+    }
+
+    setSearch("");
+  };
+
   const menuItems = [
+    {
+      id: "profile", // NOVO BOTÃO
+      title: "Meu Perfil",
+      icon: "settings" as const, // Ícone de engrenagem
+      color: "#0EA5E9", // Um azul diferente para destacar
+      route: "MeuPerfil" as const,
+    },
     {
       id: "students",
       title: "Alunos",
@@ -65,9 +119,10 @@ export default function DashboardScreen() {
   ];
 
   const filteredMenuItems = menuItems.filter((item) => {
-    if (user?.role === "ADMIN") return true;
-    if (user?.role === "PROFESSOR") return ["report"].includes(item.id);
-    if (user?.role === "ALUNO") return ["report"].includes(item.id);
+    if (user?.role === "ADMIN") return item.id !== "profile";
+    if (user?.role === "PROFESSOR")
+      return ["report", "profile"].includes(item.id);
+    if (user?.role === "ALUNO") return ["report", "profile"].includes(item.id);
     return false;
   });
 
@@ -86,7 +141,10 @@ export default function DashboardScreen() {
             </View>
             <View>
               <Text style={styles.welcomeText}>Bem-vindo de volta</Text>
-              <Text style={styles.userName}>{user?.nome || "Usuário"}</Text>
+              {/* Nome agora formatado adequadamente e impedindo quebra de linha */}
+              <Text style={styles.userName} numberOfLines={1}>
+                {formatarNome(user?.nome)}
+              </Text>
             </View>
           </View>
 
@@ -103,7 +161,9 @@ export default function DashboardScreen() {
         <SearchBar
           value={search}
           onChangeText={setSearch}
-          placeholder="Pesquisar recursos..."
+          placeholder="Pesquisar (ex: alunos, professores)..."
+          onSubmitEditing={handleSearch}
+          returnKeyType="search"
         />
       </View>
 
@@ -132,10 +192,13 @@ export default function DashboardScreen() {
             <View style={{ zIndex: 10 }}>
               <Text style={styles.statsTitle}>Status do Semestre</Text>
               <Text style={styles.statsSubtitle}>
-                Você está com 85% de progresso
+                Você concluiu {progresso}% das disciplinas
               </Text>
               <View style={styles.progressBarBackground}>
-                <View style={[styles.progressBarFill, { width: "85%" }]} />
+                {/* A largura da barra de progresso agora é baseada no cálculo real */}
+                <View
+                  style={[styles.progressBarFill, { width: `${progresso}%` }]}
+                />
               </View>
             </View>
             <Feather
@@ -197,7 +260,7 @@ const styles = StyleSheet.create({
     fontSize: typography.size.lg,
     fontWeight: typography.weight.bold,
     color: colors.text,
-    maxWidth: 150,
+    maxWidth: 150, // Garante que nomes grandes não quebrem o layout
   },
   headerActions: { flexDirection: "row", gap: spacing.sm },
   iconButton: {

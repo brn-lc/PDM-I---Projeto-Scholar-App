@@ -25,4 +25,16 @@ export const professorService = {
     const response = await api.put(`/api/professores/${id}`, data);
     return response.data;
   },
+
+  getMeuPerfil: async (email: string) => {
+    const response = await api.get(`/api/professores/perfil/${email}`);
+    return response.data;
+  },
+  updateMeuPerfil: async (emailAtual: string, data: any) => {
+    const response = await api.put(
+      `/api/professores/perfil/${emailAtual}`,
+      data,
+    );
+    return response.data;
+  },
 };
