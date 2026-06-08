@@ -23,8 +23,8 @@ exports.enrollAluno = async (req, res) => {
 // --- CONSULTA PARA O GESTOR (ADMIN/PROF) ---
 exports.getGestaoNotas = async (req, res) => {
   try {
-    // JOIN adaptado para ler a tabela 'notas' mantendo os aliases compatíveis com o frontend
-    const query = `
+    // 1. Base da Query SQL (idêntica à original)
+    let query = `
       SELECT 
         d.id as disciplina_id, d.nome as disciplina_nome, p.nome as professor_nome,
         m.id as matricula_id, a.nome as aluno_nome, a.matricula,
@@ -33,10 +33,23 @@ exports.getGestaoNotas = async (req, res) => {
       LEFT JOIN professores p ON d.professor_id = p.id
       LEFT JOIN notas m ON d.id = m.disciplina_id
       LEFT JOIN alunos a ON m.aluno_id = a.id
-      ORDER BY d.nome, a.nome
     `;
-    const result = await db.query(query);
 
+    const queryParams = [];
+
+    // 2. CONTROLE DE ACESSO: Se o perfil for PROFESSOR, filtra pelo e-mail do usuário logado
+    // O req.userRole e req.userEmail vêm direto do token decodificado no authMiddleware
+    if (req.userRole === "PROFESSOR") {
+      query += ` WHERE p.email = $1 `;
+      queryParams.push(req.userEmail);
+    }
+
+    // 3. Adiciona a ordenação padrão no final da string
+    query += ` ORDER BY d.nome, a.nome `;
+
+    const result = await db.query(query, queryParams);
+
+    // 4. Mapeamento dos dados (permanece o mesmo para manter compatibilidade com o frontend)
     const disciplinas = {};
     result.rows.forEach((row) => {
       if (!disciplinas[row.disciplina_id]) {
@@ -62,7 +75,7 @@ exports.getGestaoNotas = async (req, res) => {
 
     res.json(Object.values(disciplinas));
   } catch (error) {
-    console.error(error);
+    console.error("[Erro] Buscar dados de gestão:", error);
     res.status(500).json({ error: "Erro ao buscar dados de gestão" });
   }
 };
