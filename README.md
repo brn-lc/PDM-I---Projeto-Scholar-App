@@ -4,6 +4,7 @@
 
 Projeto desenvolvido como atividade avaliativa para a disciplina de **Programação para Dispositivos Móveis I**, ministrada pelo **Prof. André Olímpio** na **Fatec Jacareí - Centro Paula Souza**.
 
+🎥 Link do vídeo: https://youtu.be/WzftrkXENRU
 ---
 
 ## 🎯 Visão Geral
