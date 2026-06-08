@@ -105,16 +105,23 @@ exports.updateNotasDaTurma = async (req, res) => {
   const { notas } = req.body;
   try {
     for (let nota of notas) {
-      // Atualização direcionada para a tabela correta 'notas'
+      // Correção do Bug do Zero: Usa null apenas se estiver vazio de fato
+      const vNota1 =
+        nota.nota1 !== "" && nota.nota1 !== null && nota.nota1 !== undefined
+          ? nota.nota1
+          : null;
+      const vNota2 =
+        nota.nota2 !== "" && nota.nota2 !== null && nota.nota2 !== undefined
+          ? nota.nota2
+          : null;
+      const vMedia =
+        nota.media !== "" && nota.media !== "-" && nota.media !== null
+          ? nota.media
+          : null;
+
       await db.query(
         `UPDATE notas SET nota1 = $1, nota2 = $2, media = $3, situacao = $4 WHERE id = $5`,
-        [
-          nota.nota1 || null,
-          nota.nota2 || null,
-          nota.media !== "-" ? nota.media : null,
-          nota.situacao,
-          nota.id,
-        ],
+        [vNota1, vNota2, vMedia, nota.situacao, nota.id],
       );
     }
     res.json({ message: "Notas salvas com sucesso" });

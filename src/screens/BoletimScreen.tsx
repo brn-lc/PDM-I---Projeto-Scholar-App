@@ -188,32 +188,31 @@ export default function BoletimScreen() {
     [],
   );
 
-  const handleSalvarNotas = async (disciplinaId: string) => {
-    const disciplina = gestaoDisciplinas.find((d) => d.id === disciplinaId);
-    if (!disciplina) return;
+  const handleSalvarNotas = useCallback(
+    async (disciplina: DisciplinaGestao) => {
+      setSavingId(disciplina.id);
+      try {
+        const payload: NotaAtualizacao[] = disciplina.notas.map((n) => ({
+          id: n.id,
+          nota1: n.nota1,
+          nota2: n.nota2,
+          media: n.media,
+          situacao: n.situacao,
+        }));
 
-    setSavingId(disciplinaId);
-    try {
-      // Mapeia para garantir que a tipagem bate com a API
-      const payload: NotaAtualizacao[] = disciplina.notas.map((n) => ({
-        id: n.id,
-        nota1: n.nota1,
-        nota2: n.nota2,
-        media: n.media,
-        situacao: n.situacao,
-      }));
-
-      await boletimService.updateNotas(payload);
-      AlertHelper.show(
-        "Sucesso",
-        `Notas da disciplina ${disciplina.nome} salvas com sucesso!`,
-      );
-    } catch (error) {
-      AlertHelper.show("Erro", "Ocorreu um erro ao salvar as notas.");
-    } finally {
-      setSavingId(null);
-    }
-  };
+        await boletimService.updateNotas(payload);
+        AlertHelper.show(
+          "Sucesso",
+          `Notas da disciplina ${disciplina.nome} guardadas com sucesso!`,
+        );
+      } catch (error) {
+        AlertHelper.show("Erro", "Ocorreu um erro ao guardar as notas.");
+      } finally {
+        setSavingId(null);
+      }
+    },
+    [],
+  );
 
   // 2. Extracão das funções de renderização usando useCallback
   const renderGestaoItem = useCallback(
@@ -288,8 +287,8 @@ export default function BoletimScreen() {
             })}
 
             <AppButton
-              title="Salvar Notas da Turma"
-              onPress={() => handleSalvarNotas(item.id)}
+              title="Guardar Notas da Turma"
+              onPress={() => handleSalvarNotas(item)} // <--- Alteração principal aqui
               loading={savingId === item.id}
               style={{ marginTop: spacing.md }}
             />
@@ -297,7 +296,7 @@ export default function BoletimScreen() {
         )}
       </View>
     ),
-    [handleNotaChange, savingId],
+    [handleNotaChange, handleSalvarNotas, savingId], // <--- As dependências agora estão corretas
   );
 
   const renderAlunoItem = useCallback(
